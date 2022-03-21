@@ -36,6 +36,21 @@ function checkUsernameAlreadyUsed (request, response, next) {
   return next()
 }
 
+function checksExistsTodo (request, response, next) {
+  const { user } = request
+  const { id } = request.params
+
+  const todo = user.todos.find(todo => todo.id == id)
+
+  if (!todo) {
+    return response.status(404).send({ error: 'Todo not found' })
+  }
+
+  request.todo = todo
+
+  return next()
+}
+
 app.post('/users', checkUsernameAlreadyUsed, (request, response) => {
   const { name, username } = request.body
 
@@ -68,51 +83,45 @@ app.post('/todos', checksExistsUserAccount, (request, response) => {
   return response.status(201).send(todo)
 })
 
-app.put('/todos/:id', checksExistsUserAccount, (request, response) => {
-  const { user } = request
-  const { title, deadline } = request.body
-  const { id } = request.params
+app.put(
+  '/todos/:id',
+  checksExistsUserAccount,
+  checksExistsTodo,
+  (request, response) => {
+    const { todo } = request
+    const { title, deadline } = request.body
 
-  const todo = user.todos.find(todo => todo.id == id)
+    todo.title = title
+    todo.deadline = deadline
 
-  if (!todo) {
-    return response.status(404).json({ error: 'Todo not found' })
+    return response.send(todo)
   }
+)
 
-  todo.title = title
-  todo.deadline = deadline
+app.patch(
+  '/todos/:id/done',
+  checksExistsUserAccount,
+  checksExistsTodo,
+  (request, response) => {
+    const { todo } = request
 
-  return response.send(todo)
-})
+    todo.done = true
 
-app.patch('/todos/:id/done', checksExistsUserAccount, (request, response) => {
-  const { user } = request
-  const { id } = request.params
-
-  const todo = user.todos.find(todo => todo.id === id)
-
-  if (!todo) {
-    return response.status(404).json({ error: 'Todo not found' })
+    return response.send(todo)
   }
+)
 
-  todo.done = true
+app.delete(
+  '/todos/:id',
+  checksExistsUserAccount,
+  checksExistsTodo,
+  (request, response) => {
+    const { user, todo } = request
 
-  return response.send(todo)
-})
+    user.todos.splice(todo, 1)
 
-app.delete('/todos/:id', checksExistsUserAccount, (request, response) => {
-  const { user } = request
-  const { id } = request.params
-
-  const todo = user.todos.find(todo => todo.id === id)
-
-  if (!todo) {
-    return response.status(404).json({ error: 'Todo not found' })
+    return response.status(204).send(user.todo)
   }
-
-  user.todos.splice(todo, 1)
-
-  return response.status(204).send(user.todo)
-})
+)
 
 module.exports = app
